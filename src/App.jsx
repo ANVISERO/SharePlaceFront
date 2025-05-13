@@ -1,37 +1,62 @@
-import './App.css'
-import {createBrowserRouter, Route, RouterProvider} from "react-router-dom";
-import BaseReactPage from "./pages/BaseReactPage.jsx";
-import YandexCallback from "./pages/YandexCallback.jsx";
+import React from 'react';
+import { createBrowserRouter, RouterProvider, Outlet } from "react-router-dom";
+
 import YandexAuthHelper from "./pages/YandexAuthHelper.jsx";
+import PingPage from "./pages/PingPage.jsx";
+import YandexLoginPage from "./pages/yandex-login/YandexLoginPage.jsx";
 
-function App() {
+import Header from './components/Header/Header';
+import Footer from './components/Footer/Footer';
+import UserProfilePage from "./pages/profile/UserProfilePage.jsx";
+import ChatPage from "./pages/chat/ChatPage.jsx";
 
-    const router = createBrowserRouter(
-        [
-            {
-                path: "/",
-                element: <BaseReactPage />,
-                // errorElement: <NotFound />
-            },
-            {
-                path: "/auth/yandex/callback",
-                element: <YandexCallback />,
-                // errorElement: <NotFound />
-            },
-            {
-                path: "/yandex-auth-helper",
-                element: <YandexAuthHelper />,
-                // errorElement: <NotFound />
-            }
-    ]);
-
+function AppLayout() {
     return (
-        <RouterProvider router={router}>
-            <Route path='/' element={<BaseReactPage/>}/>
-            <Route path='/auth/yandex/callback' element={<YandexCallback/>}/>
-            <Route path='/yandex-auth-helper' element={<YandexAuthHelper/>}/>
-        </RouterProvider>
-    )
+        <div className="app-layout-container">
+            <Header />
+            <main className="main-content">
+                <Outlet />
+            </main>
+            <Footer />
+        </div>
+    );
 }
 
-export default App
+
+const router = createBrowserRouter([
+    {
+        element: <AppLayout />,
+        children: [
+            {
+                path: "/",
+                element: <PingPage />,
+            },
+            {
+                path: "/ping",
+                element: <PingPage />,
+            },
+            {
+                path: "/chat",
+                element: <ChatPage />,
+            },
+            {
+                path: "/profile",
+                element: <UserProfilePage />,
+            }
+        ],
+    },
+    {
+        path: "/yandex-login",
+        element: <YandexLoginPage />,
+    },
+    {
+        path: "/yandex-auth-helper",
+        element: <YandexAuthHelper />,
+    },
+]);
+
+function App() {
+    return <RouterProvider router={router} />;
+}
+
+export default App;

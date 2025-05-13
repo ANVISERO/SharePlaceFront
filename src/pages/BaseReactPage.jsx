@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import reactLogo from './../assets/react.svg';
 import viteLogo from '/vite.svg';
 import YandexAuth from "./../components/YandexAuth.jsx";
+import axios from "axios";
 
 function BaseReactPage() {
     const [count, setCount] = useState(0);
@@ -43,10 +44,29 @@ function BaseReactPage() {
                 .then(function(result) {
                     return result.handler();
                 })
-                .then(function(data) {
+                .then(async function (data) {
                     console.log('Сообщение с токеном: ', data);
                     // Здесь можно сохранить токен в состоянии или отправить на сервер
+                    try {
+                        const response = await axios.post(
+                            'http://localhost:8081/yandex/signin',
+                            {oauthToken: data.access_token},
+                            {
+                                withCredentials: true // аналог fetch.credentials = 'include'
+                            }
+                        );
 
+                        console.log('Ответ от сервера:', response.data);
+
+                    } catch (error) {
+                        if (error.response) {
+                            // Сервер ответил с ошибкой
+                            console.error('Ошибка сервера:', error.response.data);
+                        } else {
+                            // Проблема с запросом (например, сеть)
+                            console.error('Ошибка сети или axios:', error.message);
+                        }
+                    }
                 })
                 .catch(function(error) {
                     console.log('Что-то пошло не так: ', error);

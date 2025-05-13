@@ -1,0 +1,59 @@
+.profile-page-container {
+    max-width: 800px;
+    margin: 40px auto;
+    padding: 24px;
+    background-color: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.profile-page-spinner {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 70vh;
+}
+
+.profile-form .ant-form-item-label > label {
+    font-weight: 500;
+}
+
+.profile-form .ant-picker {
+    width: 100%;
+}
+
+.form-readonly-section {
+    margin-top: 24px;
+    margin-bottom: 24px;
+    padding: 16px;
+    background: #f9f9f9;
+    border-radius: 8px;
+    border: 1px solid #e8e8e8;
+}
+
+.form-readonly-section .ant-typography {
+    margin-bottom: 8px !important;
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.form-group.full-width {
+    grid-column: 1 / -1;
+}
+
+.form-group {
+    margin-bottom: 0;
+}
+
+.profile-picture-preview img {
+    max-width: 150px;
+    max-height: 150px;
+    border-radius: 8px;
+    object-fit: cover;
+    border: 1px solid #e8e8e8;
+}

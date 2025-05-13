@@ -1,0 +1,14 @@
+.app-footer {
+    background-color: #343a40; /* Dark background for footer */
+    color: #f8f9fa; /* Light text */
+    padding: 20px 30px;
+    text-align: center;
+    border-top: 1px solid #495057;
+    width: 100%; /* Explicitly set width to 100% */
+    box-sizing: border-box; /* Padding and border won't add to the width */
+}
+
+.app-footer p {
+    margin: 0 0 10px 0;
+    font-size: 0.9em;
+}
