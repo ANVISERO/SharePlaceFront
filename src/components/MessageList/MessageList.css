@@ -1,0 +1,84 @@
+.message-list-container {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding: 16px;
+    background-color: #f0f2f5;
+}
+
+.message-list-container.empty-chat {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+}
+
+.message-item {
+    padding: 8px 0 !important;
+    border-bottom: none !important;
+    display: flex;
+}
+
+.message-item .ant-list-item-meta {
+    width: 100%;
+    display: flex;
+    align-items: flex-end;
+}
+
+.message-item.current-user {
+    justify-content: flex-end;
+}
+
+.message-item.current-user .ant-list-item-meta {
+    align-items: flex-end;
+    text-align: right;
+}
+
+
+.message-item.current-user .message-content-wrapper {
+    background-color: #1890ff;
+    color: white;
+    border-radius: 18px 18px 4px 18px;
+    margin-left: auto;
+    margin-right: 0;
+}
+.message-item.current-user .message-content-wrapper .ant-typography{
+    color: white;
+}
+
+
+.message-item.other-user .message-content-wrapper {
+    background-color: #ffffff;
+    color: #333;
+    border-radius: 18px 18px 18px 4px;
+    margin-right: auto;
+    margin-left: 0;
+}
+
+.message-content-wrapper {
+    padding: 8px 12px;
+    max-width: 70%;
+    word-wrap: break-word;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+.message-text {
+    margin-bottom: 4px !important;
+    white-space: pre-wrap;
+}
+
+.message-timestamp {
+    font-size: 0.75em;
+    display: block;
+}
+
+.message-item.current-user .message-timestamp {
+    text-align: right;
+}
+
+.message-item.other-user .ant-list-item-meta-avatar {
+    margin-right: 10px;
+}
+
+.message-item.current-user .ant-list-item-meta-avatar {
+    display: none;
+}
