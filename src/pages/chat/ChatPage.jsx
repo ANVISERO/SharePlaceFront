@@ -1,20 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react'; // Добавил useCallback для полноты
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import axios from 'axios';
 import './ChatPage.css'; // Импортируем CSS файл
-
-// --- Заглушки данных (mockMessages можно будет полностью убрать, когда загрузка сообщений будет с API) ---
-const mockMessages = {
-    // chat1: [
-    //     { id: 'm1', text: 'Привет! Как твои дела?', senderId: 'chat1', timestamp: '10:30', isMe: false },
-    //     { id: 'm2', text: 'Привет! Все отлично, спасибо :) А у тебя?', senderId: 'currentUser', timestamp: '10:31', isMe: true },
-    // ],
-    // "6825ae2e41b49c2c499cf93f": [
-    //     { id: 'api_m1', text: 'Это сообщение из моковых данных для чата с API ID.', senderId: 'someUser', timestamp: '11:00', isMe: false },
-    //     { id: 'api_m2', text: 'Понял!', senderId: 'currentUser', timestamp: '11:01', isMe: true },
-    // ],
-};
 
 const getRandomColor = () => {
     const letters = '0123456789ABCDEF';
@@ -36,7 +24,7 @@ const getInitials = (name) => {
 
 const ChatPage = () => {
     const stompClientRef = useRef(null);
-    const currentSubscriptionRef = useRef(null); // Для хранения текущей подписки
+    const currentSubscriptionRef = useRef(null);
     const [currentUser, setCurrentUser] = useState(null);
     const [chats, setChats] = useState([]);
     const [selectedChatId, setSelectedChatId] = useState(null);
@@ -48,6 +36,10 @@ const ChatPage = () => {
     const [chatError, setChatError] = useState(null);
     const [loadingMessages, setLoadingMessages] = useState(false);
     const [messagesError, setMessagesError] = useState(null);
+
+    // Состояния для уведомлений
+    const [rawUnreadNotifications, setRawUnreadNotifications] = useState([]);
+    const [unreadCountsByRoom, setUnreadCountsByRoom] = useState({});
 
 
     // Загрузка данных пользователя из sessionStorage
@@ -102,7 +94,7 @@ const ChatPage = () => {
                                 avatarColor: getRandomColor(),
                                 lastMessage: 'Нет новых сообщений',
                                 timestamp: chat.lastActivityAt ? new Date(chat.lastActivityAt).toLocaleTimeString([], { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'Недавно',
-                                unread: 0,
+                                // unreadCount будет добавлен ниже
                                 originalType: chat.type,
                                 participantsInfo: chat.participantsInfo,
                             };
@@ -135,7 +127,50 @@ const ChatPage = () => {
             setChats([]);
             setSelectedChatId(null);
         }
-    }, [currentUser]);
+    }, [currentUser]); // Зависимость только от currentUser
+
+    // useEffect для загрузки непрочитанных уведомлений
+    const fetchUnreadNotifications = useCallback(() => {
+        if (currentUser && currentUser.id) {
+            console.log('ChatPage: Запрос непрочитанных уведомлений...');
+            axios.get('http://localhost:8081/api/chat/notifications/unread', {
+                withCredentials: true,
+            })
+                .then(response => {
+                    if (response.data && Array.isArray(response.data)) {
+                        setRawUnreadNotifications(response.data);
+                        console.log('ChatPage: Непрочитанные уведомления загружены:', response.data);
+                    } else {
+                        setRawUnreadNotifications([]);
+                        console.warn('ChatPage: Получен неожиданный формат для непрочитанных уведомлений:', response.data);
+                    }
+                })
+                .catch(error => {
+                    console.error('ChatPage: Ошибка загрузки непрочитанных уведомлений:', error);
+                    setRawUnreadNotifications([]);
+                });
+        }
+    }, [currentUser]); // Зависит от currentUser
+
+    // Вызываем fetchUnreadNotifications при монтировании (если currentUser уже есть) или при изменении currentUser
+    useEffect(() => {
+        fetchUnreadNotifications();
+    }, [fetchUnreadNotifications]);
+
+
+    // useEffect для обработки rawUnreadNotifications и обновления unreadCountsByRoom
+    useEffect(() => {
+        const counts = {};
+        rawUnreadNotifications.forEach(notification => {
+            // Убедимся, что уведомление действительно непрочитано (на случай если API вернет и прочитанные)
+            // и что у него есть roomId
+            if (notification.roomId && !notification.isRead) {
+                counts[notification.roomId] = (counts[notification.roomId] || 0) + 1;
+            }
+        });
+        setUnreadCountsByRoom(counts);
+        console.log('ChatPage: Счетчики непрочитанных по комнатам обновлены:', counts);
+    }, [rawUnreadNotifications]);
 
 
     // Загрузка истории сообщений для выбранного чата
@@ -146,7 +181,7 @@ const ChatPage = () => {
             setMessages([]);
             axios.get(`http://localhost:8081/api/chat/rooms/${selectedChatId}/messages`, {
                 withCredentials: true,
-                params: { page: 0, size: 50 }
+                params: { page: 0, size: 50, sort: 'timestamp,desc'  }
             })
                 .then(response => {
                     if (response.data && Array.isArray(response.data.content)) {
@@ -156,7 +191,7 @@ const ChatPage = () => {
                             senderId: msg.senderId,
                             timestamp: new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                             isMe: String(msg.senderId) === String(currentUser.id),
-                        })).reverse();
+                        })).reverse(); // Сообщения от сервера приходят от новых к старым, реверсируем для отображения старых вверху
                         setMessages(fetchedMessages);
                         console.log(`ChatPage: Загружена история сообщений для чата ${selectedChatId}:`, fetchedMessages);
                     } else {
@@ -186,20 +221,15 @@ const ChatPage = () => {
     useEffect(() => {
         if (!currentUser || !selectedChatId) {
             if (stompClientRef.current && stompClientRef.current.active) {
-                console.log('ChatPage: Деактивация STOMP из-за отсутствия currentUser или selectedChatId.');
                 stompClientRef.current.deactivate();
             }
             return;
         }
-
         if (stompClientRef.current && stompClientRef.current.connected &&
             currentSubscriptionRef.current && currentSubscriptionRef.current.id.includes(selectedChatId)) {
-            console.log(`ChatPage: STOMP уже подключен и подписан на /topic/room/${selectedChatId}`);
             return;
         }
-
         if (stompClientRef.current) {
-            console.log('ChatPage: Деактивация существующего STOMP клиента для переподключения/переподписки.');
             stompClientRef.current.deactivate();
             stompClientRef.current = null;
             if(currentSubscriptionRef.current) {
@@ -208,7 +238,6 @@ const ChatPage = () => {
             }
         }
 
-        console.log(`ChatPage: Инициализация STOMP клиента для чата ${selectedChatId}, currentUser: ${currentUser.name}`);
         const client = new Client({
             webSocketFactory: () => new SockJS('http://localhost:8081/ws-chat'),
             connectHeaders: {},
@@ -227,6 +256,17 @@ const ChatPage = () => {
 
                             if (String(receivedMessage.roomId) === String(selectedChatId)) {
                                 setMessages(prevMessages => [
+                                    // Добавляем новое сообщение в НАЧАЛО массива (если отображение newest-first)
+                                    // или в КОНЕЦ (если отображение oldest-first и нет column-reverse)
+                                    // Ваш текущий код истории сообщений делает .reverse() и messageArea не column-reverse,
+                                    // значит, новые сообщения должны добавляться в конец для отображения внизу.
+                                    // Однако, предыдущая версия для входящих STOMP была [...new, ...old]
+                                    // Давайте приведем к одному виду: новые сообщения всегда в конце массива,
+                                    // а CSS column-reverse сделает так, что они будут внизу.
+                                    // Если же .messageArea НЕ column-reverse, то .reverse() истории не нужен,
+                                    // и новые сообщения добавляются в конец.
+                                    // Ваша история сейчас: sort: desc, потом reverse -> oldest first. Новые в конец. CSS НЕ column-reverse.
+                                    // Для консистентности, если новые сообщения идут в конец массива:
                                     ...prevMessages,
                                     {
                                         id: receivedMessage.id,
@@ -236,8 +276,11 @@ const ChatPage = () => {
                                         isMe: String(receivedMessage.senderId) === String(currentUser.id),
                                     }
                                 ]);
-                            } else {
-                                console.warn(`STOMP: Получено сообщение для другого чата (${receivedMessage.roomId}), текущий ${selectedChatId}`);
+                                // Если сообщение не от текущего пользователя И текущий чат не активен (сложно отследить без focus)
+                                // или просто если сообщение не от меня
+                                if (String(receivedMessage.senderId) !== String(currentUser.id)) {
+                                    fetchUnreadNotifications(); // Обновляем счетчики
+                                }
                             }
                         } catch (e) {
                             console.error('STOMP: Ошибка парсинга полученного сообщения', e, message.body);
@@ -257,77 +300,88 @@ const ChatPage = () => {
                 console.log('STOMP: WebSocket соединение закрыто:', event);
             }
         });
-
         stompClientRef.current = client;
-        console.log('STOMP: Активация клиента...');
         client.activate();
-
         return () => {
-            console.log(`STOMP: Очистка useEffect для чата ${selectedChatId}. Деактивация клиента.`);
             if (currentSubscriptionRef.current) {
                 currentSubscriptionRef.current.unsubscribe();
-                console.log(`STOMP: Отписан от /topic/room/${selectedChatId}`);
                 currentSubscriptionRef.current = null;
             }
             if (stompClientRef.current && stompClientRef.current.active) {
                 stompClientRef.current.deactivate();
-                console.log('STOMP: Клиент деактивирован.');
             }
             stompClientRef.current = null;
         };
-    }, [currentUser, selectedChatId]);
+    }, [currentUser, selectedChatId, fetchUnreadNotifications]); // Добавили fetchUnreadNotifications в зависимости
 
 
-    const handleSelectChat = (chatId) => {
+    const handleSelectChat = useCallback(async (chatId) => {
         console.log('ChatPage: Выбран чат:', chatId);
-        setSelectedChatId(chatId);
-    };
+        setSelectedChatId(chatId); // Устанавливаем выбранный чат
+
+        // ДОБАВЛЕНО: Логика пометки уведомлений как прочитанных
+        if (currentUser && currentUser.id && (unreadCountsByRoom[chatId] || 0) > 0) { // Проверяем через unreadCountsByRoom
+            console.log(`ChatPage: Попытка пометить уведомления как прочитанные для комнаты ${chatId}`);
+            try {
+                // Отправляем POST-запрос на ваш новый эндпоинт
+                await axios.post(`http://localhost:8081/api/chat/notifications/${chatId}/read-all`, {}, {
+                    withCredentials: true, // Для передачи сессионных cookie и других credentials
+                });
+                console.log(`ChatPage: Запрос на пометку уведомлений для комнаты ${chatId} как прочитанных отправлен.`);
+                // После успешной пометки на сервере, перезагружаем список непрочитанных уведомлений,
+                // чтобы обновить счетчики на клиенте
+                fetchUnreadNotifications(); // ДОБАВЛЕНО: Обновление счетчиков
+            } catch (error) {
+                console.error(`ChatPage: Ошибка при пометке уведомлений как прочитанных для комнаты ${chatId}:`, error);
+                // Здесь можно добавить обработку ошибок для пользователя, если это необходимо
+                // Например, setChatError('Не удалось обновить статус уведомлений.');
+            }
+        } else {
+            console.log(`ChatPage: Нет непрочитанных уведомлений для комнаты ${chatId} для пометки или пользователь не определен.`);
+        }
+        // КОНЕЦ ДОБАВЛЕННОЙ ЛОГИКИ
+    }, [currentUser, unreadCountsByRoom, fetchUnreadNotifications]);
 
     const handleSendMessage = () => {
         if (newMessage.trim() === '' || !selectedChatId || !currentUser || !currentUser.id) {
-            console.warn('Невозможно отправить сообщение: нет текста, не выбран чат или отсутствует ID пользователя.');
             return;
         }
-
         if (stompClientRef.current && stompClientRef.current.connected) {
-            // ИЗМЕНЕНО: Payload теперь содержит 'content' и 'userId'
             const payload = {
                 content: newMessage,
-                userId: String(currentUser.id) // Убедимся, что ID пользователя - строка, если бэкенд ожидает String
+                userId: String(currentUser.id)
             };
             const destination = `/app/chat.sendMessage/${selectedChatId}`;
-
             try {
                 stompClientRef.current.publish({
                     destination: destination,
                     body: JSON.stringify(payload)
                 });
-                console.log(`STOMP: Сообщение отправлено на ${destination}:`, payload);
                 setNewMessage('');
             } catch (error) {
                 console.error('STOMP: Ошибка при отправке сообщения:', error);
                 alert('Не удалось отправить сообщение.');
             }
         } else {
-            console.error('STOMP клиент не подключен. Сообщение не отправлено.');
             alert('Не удалось отправить сообщение. Нет подключения к чат-серверу.');
         }
     };
 
-    const filteredChats = chats.filter(chat =>
-        chat.name && chat.name.toLowerCase().includes(searchTerm.toLowerCase())
+    // Обновляем filteredChats, чтобы он включал unreadCount
+    const filteredChats = chats.map(chat => ({
+        ...chat,
+        unreadCount: unreadCountsByRoom[chat.id] || 0, // Получаем счетчик из unreadCountsByRoom
+    })).filter(chatWithCount =>
+        chatWithCount.name && chatWithCount.name.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    const selectedChatDetails = chats.find(chat => chat.id === selectedChatId);
+    const selectedChatDetails = filteredChats.find(chat => chat.id === selectedChatId);
 
     return (
         <div className="chatPageContainer">
             {currentUser && (
                 <div className="userInfoHeader">
                     Пользователь: <strong>{currentUser.name} {currentUser.surname}</strong> ({currentUser.email})
-                    <span style={{ float: 'right', fontSize: '0.9em', color: '#555' }}>
-                        STOMP: {stompClientRef.current?.connected ? 'Подключен' : (stompClientRef.current?.active ? 'Подключение...' : 'Отключен')}
-                    </span>
                 </div>
             )}
             {!currentUser && (
@@ -361,7 +415,15 @@ const ChatPage = () => {
                                         {chat.avatarInitial}
                                     </div>
                                     <div className="chatInfo">
-                                        <div className="chatName">{chat.name}</div>
+                                        <div className="chatName">
+                                            {chat.name}
+                                            {/* Отображение счетчика непрочитанных сообщений */}
+                                            {chat.unreadCount > 0 && (
+                                                <span className="unreadBadge">
+                                                    {chat.unreadCount}
+                                                </span>
+                                            )}
+                                        </div>
                                         <div className="lastMessage">{chat.timestamp}</div>
                                     </div>
                                 </div>

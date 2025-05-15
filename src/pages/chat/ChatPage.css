@@ -116,12 +116,31 @@
 
 /* Стили для имени чата */
 .chatName {
-    font-weight: 600; /* Полужирный для имени */
+    font-weight: 600;
     margin-bottom: 4px;
     font-size: 15px;
     color: #333;
+    display: flex;             /* Добавлено: Включаем Flexbox */
+    justify-content: space-between; /* Добавлено: Распределяет пространство между элементами (имя слева, значок справа) */
+    align-items: center;       /* Добавлено: Выравнивает имя и значок по вертикали */
+    width: 100%; /* Убедимся, что .chatName занимает всю доступную ширину в .chatInfo */
 }
 
+.unreadBadge {
+    margin-left: 8px; /* Небольшой отступ слева от имени чата */
+    background-color: #007bff;
+    color: white;
+    border-radius: 50%;
+    padding: 2px 7px;
+    font-size: 0.75em;
+    font-weight: bold;
+    line-height: 1;
+    min-width: 18px;
+    text-align: center;
+    display: inline-block;
+    vertical-align: middle;
+    /* flex-shrink: 0; Можно добавить, если имя чата слишком длинное и сжимает значок */
+}
 /* Стили для последнего сообщения */
 .lastMessage {
     font-size: 13px;
